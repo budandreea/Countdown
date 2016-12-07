@@ -1,104 +1,208 @@
 package com.countdown.tinonino;
 
-import java.util.concurrent.TimeUnit;
 
-import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
+import android.hardware.Camera;
+import android.hardware.Camera.Parameters;
 import android.media.MediaPlayer;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Vibrator;
-import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 
-@TargetApi(Build.VERSION_CODES.GINGERBREAD)
-@SuppressLint("NewApi")
+public class Countdown extends Activity implements OnClickListener {
 
-public class Countdown extends Activity {
+	private Button btnStart, btnStop;
+	private EditText editTimeValue;
+	private TextView textViewTime, timp, minute;
 	
-	Button btnStart, btnStop;
-	TextView textViewTime;
+	private CountDownTimer countDownTimer; 
+	private long totalTime;							
+	private long timeBlink; 
+	private boolean blink;
+	
+	private Camera camera;
+    private boolean isFlashOn;
+    Parameters params;
+	
 	MediaPlayer mpCountdown;
+	Vibrator vCountdown;
 	
+	
+	long[] pattern = {0, 100, 1000, 300, 200, 100, 500, 200, 100};
+
+
+	/** Called when the activity is first created. */
 	@Override
-	protected void onCreate(Bundle savedInstanceState) {
+	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_countdown);
 
-		final MediaPlayer mpCountdown = MediaPlayer.create(this,R.raw.heathens);
-		
-		btnStart = (Button) findViewById(R.id.btnStart);	
+		btnStart = (Button) findViewById(R.id.btnStart);
 		btnStop = (Button) findViewById(R.id.btnStop);
-        textViewTime = (TextView) findViewById(R.id.textViewTime);
-			
-			textViewTime.setText("00:03:00");
-			
-		final CounterClass timer = new CounterClass(180000, 1000);
-		btnStart.setOnClickListener(new OnClickListener() {
-			
-			
-			
-			
-			public void onClick(View v) {
-				// TODO Auto-generated method stub
-				timer.start();
-				mpCountdown.start();
-			}
-		});
+		textViewTime = (TextView) findViewById(R.id.textViewTime);
+		editTimeValue = (EditText) findViewById(R.id.editTimeText);
+		timp = (TextView) findViewById(R.id.timp);
+		minute = (TextView) findViewById(R.id.minute);
 		
-		btnStop.setOnClickListener(new OnClickListener() {
+		btnStart.setOnClickListener(this);
+		btnStop.setOnClickListener(this);
+		
+		timp.setVisibility(View.GONE);
+	
+		getCamera();
+		
+		this.vCountdown = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
+		this.mpCountdown = MediaPlayer.create(this,R.raw.maroon);
+
+	}
+
+	@Override
+	public void onClick(View v) {
+		if (v.getId() == R.id.btnStart) {
+			textViewTime.setTextAppearance(getApplicationContext(),R.style.AppTheme);
+			setTimer();
+			btnStop.setVisibility(View.VISIBLE);
+			btnStart.setVisibility(View.GONE);
+			timp.setVisibility(View.VISIBLE);
+			minute.setVisibility(View.GONE);
+			editTimeValue.setVisibility(View.GONE);
+			editTimeValue.setText("");
+			startTimer();
+			mpCountdown.start();
+			vCountdown.vibrate(pattern, 1);
+			turnOnFlash();
+			
+
+		} else if (v.getId() == R.id.btnStop) {
+			countDownTimer.cancel();
+			btnStart.setVisibility(View.VISIBLE);
+			btnStop.setVisibility(View.GONE);
+			timp.setVisibility(View.GONE);
+			minute.setVisibility(View.VISIBLE);
+			editTimeValue.setVisibility(View.VISIBLE);
+			mpCountdown.pause();
+			vCountdown.cancel();
+			turnOffFlash();
+		}
+	}
+	
+	
+	
+	protected void turnOnFlash() {
+
+        if(!isFlashOn) {
+            if(camera == null || params == null) {
+                return;
+            }
+
+            params = camera.getParameters();
+            params.setFlashMode(Parameters.FLASH_MODE_TORCH);
+            camera.setParameters(params);
+            camera.startPreview();
+            isFlashOn = true;
+        }
+
+    }
+	
+	
+	private void getCamera() {
+
+        if (camera == null) {
+            try {
+                camera = Camera.open();
+                params = camera.getParameters();
+            }catch (Exception e) {
+
+            }
+        }
+        
+
+    }
+
+    protected void turnOffFlash() {
+
+            if (isFlashOn) {
+                if (camera == null || params == null) {
+                    return;
+                }
+
+                params = camera.getParameters();
+                params.setFlashMode(Parameters.FLASH_MODE_OFF);
+                camera.setParameters(params);
+                camera.stopPreview();
+                isFlashOn = false;
+            }
+    }
+    
+
+	private void setTimer() {
+		int time = 0;
+		if (!editTimeValue.getText().toString().equals("")) {
+			time = Integer.parseInt(editTimeValue.getText().toString());
+		} else
+			
+			return;
+
+		totalTime = 60 * time * 1000;
+		timeBlink = 30 * 1000;
+	}
+
+	private void startTimer() {
+		countDownTimer = new CountDownTimer(totalTime, 500) {
 			
 			@Override
-			public void onClick(View v) {
-				// TODO Auto-generated method stub
-				timer.cancel();
-				mpCountdown.release();
+			public void onTick(long leftTimeInMilliseconds) {
+				long seconds = leftTimeInMilliseconds / 1000;
+				
+				if (isFlashOn){
+					turnOffFlash();
+				}
+				else {
+					turnOnFlash();
+				}
+				
+				if (leftTimeInMilliseconds < timeBlink) {
+					textViewTime.setTextAppearance(getApplicationContext(),
+							R.style.AppBaseTheme);
+		
+					
+					if (blink) {
+						textViewTime.setVisibility(View.VISIBLE);
+					} else {
+						textViewTime.setVisibility(View.INVISIBLE);
+					}
+
+					blink = !blink; 
+				}
+
+				textViewTime.setText(String.format("%02d", seconds / 60)
+						+ ":" + String.format("%02d", seconds % 60));
+				
 			}
-		});
-		
-		
+			
+			@Override
+			public void onFinish() {
+				textViewTime.setText("Time up!");
+				textViewTime.setVisibility(View.VISIBLE);
+				btnStart.setVisibility(View.VISIBLE);
+				btnStop.setVisibility(View.GONE);
+				timp.setVisibility(View.GONE);
+				minute.setVisibility(View.VISIBLE);
+				editTimeValue.setVisibility(View.VISIBLE);
+				mpCountdown.release();
+				vCountdown.cancel();
+				turnOffFlash();
+			}
+
+		}.start();
+
 	}
 
-	@TargetApi(Build.VERSION_CODES.GINGERBREAD)
-	@SuppressLint("NewApi")
-	public class CounterClass extends CountDownTimer {
-
-		public CounterClass(long millisInFuture, long countDownInterval) {
-			super(millisInFuture, countDownInterval);
-			// TODO Auto-generated constructor stub
-		}
-
-		@SuppressLint("NewApi")
-		@TargetApi(Build.VERSION_CODES.GINGERBREAD)
-		@Override
-		public void onTick(long millisUntilFinished) {
-			// TODO Auto-generated method stub
-			
-			long millis = millisUntilFinished;
-			String hms = String.format("%02d:%02d:%02d", TimeUnit.MILLISECONDS.toHours(millis),
-					TimeUnit.MILLISECONDS.toMinutes(millis) - TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(millis)),
-					TimeUnit.MILLISECONDS.toSeconds(millis) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)));
-			System.out.println(hms);
-			textViewTime.setText(hms);
-		}
-
-		@Override
-		public void onFinish() {
-			// TODO Auto-generated method stub
-			textViewTime.setText("Completed.");
-			
-		
-		}
-		
-		
-	}
-	
-	
 }
 		
